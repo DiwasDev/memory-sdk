@@ -1,0 +1,76 @@
+
+flowchart TD
+    U["User / Agent"] --> API["Memory SDK / API Gateway"]
+
+    %% WRITE PATH
+    API --> C["1. CAPTURE"]
+    C --> E["Extract candidate memories"]
+    E --> V["Evaluate importance, confidence, privacy<br/>Deduplicate + detect conflicts"]
+    V --> D{"Worth storing?"}
+    D -- No --> X["Discard candidate"]
+    D -- Yes --> W["Write Service<br/>Create, update, or merge"]
+
+    %% STORAGE
+    W --> R{"2. STORAGE<br/>Route by type and lifetime"}
+
+    R --> WM["Working Memory<br/>Current context"]
+    R --> SM["Session Memory<br/>Short-lived state"]
+    R --> LM["Long-term Memory<br/>Durable personal memories"]
+    R --> KM["Knowledge Memory<br/>Documents and vector index"]
+
+    META["Memory metadata<br/>Source, importance, confidence<br/>Created / updated timestamps<br/>Valid from / valid to<br/>Weight + reinforcement count"]
+    LM -.-> META
+
+    %% READ PATH
+    API --> Q["3. RETRIEVAL"]
+    Q --> H["Hybrid Search<br/>Vector + Keyword + Graph"]
+
+    WM --> H
+    SM --> H
+    LM --> H
+    KM --> H
+
+    H --> RK["Ranking + Relevance Filtering"]
+    RK --> CC["Context Composer<br/>Token budget + deduplication<br/>Materialized user profile"]
+    CC --> LLM["Agent / LLM"]
+    LLM --> OUT["Response to User"]
+
+    %% CROSS-CUTTING SUBSYSTEMS
+    subgraph OPS["CROSS-CUTTING SUBSYSTEMS"]
+        EV["4. EVALUATION<br/>Recall, precision, corrections, quality"]
+        DC["5. DECAY<br/>Reinforce, expire, archive"]
+        GV["6. GOVERNANCE<br/>Consent, permissions, deletion, audit"]
+    end
+
+    EV -. "Write quality feedback" .-> V
+    EV -. "Retrieval quality feedback" .-> RK
+
+    DC -. "Lifecycle policies" .-> LM
+    DC -. "Lifecycle policies" .-> SM
+    CC -. "Useful retrieval reinforces memory" .-> DC
+
+    GV -. "Authorize requests" .-> API
+    GV -. "Enforce write policies" .-> W
+    GV -. "Enforce read and deletion policies" .-> H
+
+    OUT -. "Future memory candidates" .-> C
+
+    %% OPTIONAL EXTENSION
+    GRAPH["Optional extension<br/>Graph store or graph index"]
+    LM -. "Optional relationship index" .-> GRAPH
+    GRAPH -. "Graph retrieval" .-> H
+
+    %% FAILURE HANDLING
+    Q -. "Retrieval unavailable" .-> FALLBACK["Continue without memory"]
+    FALLBACK --> LLM
+
+    %% STYLES
+    classDef core fill:#e8f0fe,stroke:#355c9a,color:#172b4d
+    classDef store fill:#e5f4e8,stroke:#438455,color:#163c23
+    classDef ops fill:#fff0db,stroke:#b47728,color:#56360d
+    classDef optional fill:#f3f0fa,stroke:#8673a8,color:#302449,stroke-dasharray:5 5
+
+    class C,E,V,D,W,Q,H,RK,CC core
+    class WM,SM,LM,KM store
+    class EV,DC,GV ops
+    class META,GRAPH,FALLBACK optional
